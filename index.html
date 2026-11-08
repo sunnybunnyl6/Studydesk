@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudyDesk – free exam prep from your own files</title>
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1f6f5c">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="StudyDesk">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+:root{--bg:#eef2f0;--panel:#fff;--ink:#16211d;--mute:#5d6b65;--line:#d3ddd8;--accent:#1f6f5c;--accent-ink:#fff;--good:#1f7a43;--bad:#b3362b}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1714;--panel:#17221e;--ink:#e6efeb;--mute:#8fa097;--line:#2a3a34;--accent:#4cc3a0;--accent-ink:#06130e;--good:#5fd68a;--bad:#ff8a7d}}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.55 Georgia,"Times New Roman",serif;background:var(--bg);color:var(--ink)}
+h1,h2,h3,button,input,select,label,.ui{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:1.25rem;margin:0}
+main{display:grid;grid-template-columns:320px 1fr;gap:20px;padding:20px 24px;max-width:1200px;margin:auto}
+@media(max-width:800px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.panel h2{font-size:1rem;margin:0 0 10px}
+button,select,input{font-size:.95rem;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 12px}
+button{cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;color:var(--mute);cursor:pointer}
+.drop.over{border-color:var(--accent)}
+.file{display:flex;justify-content:space-between;gap:8px;font-size:.88rem;padding:6px 0;border-bottom:1px solid var(--line)}
+.file button{padding:2px 8px}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tabs button[aria-selected=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+label{display:block;font-size:.85rem;color:var(--mute);margin:10px 0 4px}
+input,select{width:100%}
+.msg{padding:10px 14px;border-radius:10px;margin:8px 0;white-space:pre-wrap}
+.msg.me{background:var(--accent);color:var(--accent-ink);margin-left:15%}
+.msg.ai{background:var(--bg);border:1px solid var(--line);margin-right:8%}
+.row{display:flex;gap:8px;margin-top:10px}
+.q{margin:14px 0;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.opt{display:block;width:100%;text-align:left;margin:5px 0}
+.opt.right{border-color:var(--good);color:var(--good)}
+.opt.wrong{border-color:var(--bad);color:var(--bad)}
+.why{color:var(--mute);font-size:.9rem;margin-top:6px}
+.card{min-height:170px;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:1.2rem;border:1px solid var(--line);border-radius:12px;cursor:pointer;background:var(--bg)}
+.note{font-size:.82rem;color:var(--mute)}
+.hide{display:none}
+#out{min-height:200px;white-space:pre-wrap}
+.bar{height:6px;background:var(--line);border-radius:3px;margin-bottom:10px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.opt{transition:background .15s,border-color .15s}.opt:hover:not(:disabled){border-color:var(--accent)}.opt:disabled{opacity:1;cursor:default}
+.flip{perspective:900px}.flip .in{position:relative;min-height:190px;transition:transform .45s;transform-style:preserve-3d;cursor:pointer}.flip.on .in{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:1.2rem;border:1px solid var(--line);border-radius:12px;background:var(--bg);backface-visibility:hidden}
+.face.back{transform:rotateY(180deg);background:var(--panel);border-color:var(--accent)}
+.msg.ai:empty::after{content:"…"}
+@media(prefers-reduced-motion:reduce){.flip .in,.bar i{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>StudyDesk</h1>
+  <div class="ui" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="note" id="xp"></span><button id="inst" class="hide">Install app</button><button id="pm"></button><span class="note" id="status">No files yet</span></div>
+</header>
+<main>
+  <aside>
+    <div class="panel">
+      <h2>1. Add your study files</h2>
+      <div class="drop" id="drop" tabindex="0">Drop PDF, Word (.docx), TXT or MD files here, or click to choose</div>
+      <input type="file" id="pick" accept=".pdf,.docx,.txt,.md,.csv" multiple class="hide">
+      <div id="files"></div>
+      <p class="note">Files are read in your browser and are remembered on this device, so you only add them once. Only the text you study is sent to the AI you pick below.</p>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h2>2. Pick a free AI</h2>
+      <label for="prov">Provider</label>
+      <select id="prov">
+        <option value="ollama">Ollama – on your computer, unlimited</option>
+        <option value="gemini">Google Gemini – free key, generous limits</option>
+        <option value="claude">Claude (Anthropic) – best answers, paid key</option>
+        <option value="groq">Groq – free key, fast, daily limits</option>
+      </select>
+      <label for="model">Model</label><input id="model">
+      <label for="key" id="keylab">API key</label><input id="key" type="password" autocomplete="off">
+      <p class="note" id="help"></p>
+    </div>
+  </aside>
+  <section class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-t="chat">Ask</button>
+      <button role="tab" aria-selected="false" data-t="summary">Summary</button>
+      <button role="tab" aria-selected="false" data-t="quiz">Quiz</button>
+      <button role="tab" aria-selected="false" data-t="cards">Flashcards</button>
+    </div>
+
+    <input id="focus" placeholder="Focus on a topic (optional): used by Summary, Quiz and Flashcards" style="margin-bottom:14px">
+    <div id="t-chat">
+      <div id="log"><div class="msg ai">Add your notes, then ask me anything about them. I answer only from your files.</div></div>
+      <div id="chips" class="row" style="flex-wrap:wrap"></div>
+      <div class="row"><input id="ask" placeholder="e.g. Explain chapter 3 simply"><button class="primary" id="send">Send</button></div>
+    </div>
+
+    <div id="t-summary" class="hide">
+      <button class="primary" id="mkSum">Make exam summary</button>
+      <div id="out" class="msg ai" style="margin-top:12px">Your summary appears here.</div>
+    </div>
+
+    <div id="t-quiz" class="hide">
+      <div class="row" style="margin:0 0 8px"><input id="qn" type="number" min="3" max="20" value="8" style="width:90px"><button class="primary" id="mkQuiz">Make quiz</button></div>
+      <div id="quiz"></div>
+    </div>
+
+    <div id="t-cards" class="hide">
+      <div class="row" style="margin:0 0 8px"><input id="cn" type="number" min="5" max="40" value="12" style="width:90px"><button class="primary" id="mkCards">Make flashcards</button></div>
+      <div id="cardbox"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const PRE={
+  ollama:{url:"http://localhost:11434/v1/chat/completions",model:"llama3.1",key:false,help:"Install Ollama (ollama.com), run: ollama pull llama3.1. If the browser blocks it, start Ollama with OLLAMA_ORIGINS=* set. No limits, works offline."},
+  gemini:{url:"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",model:"gemini-2.5-flash",key:true,help:"Get a free key at aistudio.google.com. Handles very long notes. Free tier has rate limits."},
+  claude:{url:"https://api.anthropic.com/v1/messages",model:"claude-haiku-5-5",key:true,help:"Paid, pay-per-use key from console.anthropic.com (separate from a claude.ai subscription). Haiku is cheapest. For stronger answers type claude-sonnet-5-5 or claude-opus-5-5 as the model. Only use this on your own computer: the key is visible to anyone who opens the page."},
+  groq:{url:"https://api.groq.com/openai/v1/chat/completions",model:"llama-3.3-70b-versatile",key:true,help:"Get a free key at console.groq.com. Fast, but long notes may hit size limits."}
+};
+let files=[],S={};try{files=JSON.parse(localStorage.getItem("sdf")||"[]")}catch(e){}
+try{S=JSON.parse(localStorage.getItem("sd")||"{}")}catch(e){}
+const save=()=>{try{localStorage.setItem("sd",JSON.stringify(S))}catch(e){}};
+function prov(){const p=PRE[$("prov").value];$("model").value=S[$("prov").value+"m"]||p.model;$("key").value=S[$("prov").value+"k"]||"";$("key").classList.toggle("hide",!p.key);$("keylab").classList.toggle("hide",!p.key);$("help").textContent=p.help}
+$("prov").value=S.prov||"ollama";prov();
+$("prov").onchange=()=>{S.prov=$("prov").value;save();prov()};
+$("model").onchange=()=>{S[$("prov").value+"m"]=$("model").value;save()};
+$("key").onchange=()=>{S[$("prov").value+"k"]=$("key").value;save()};
+
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  ["chat","summary","quiz","cards"].forEach(t=>$("t-"+t).classList.toggle("hide",t!==b.dataset.t));
+});
+
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+async function readFile(f){
+  if(/\.pdf$/i.test(f.name)){
+    const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;let t="";
+    for(let i=1;i<=pdf.numPages;i++){const c=await(await pdf.getPage(i)).getTextContent();t+=c.items.map(x=>x.str).join(" ")+"\n"}
+    return t;
+  }
+  if(/\.docx$/i.test(f.name))return (await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()})).value;
+  return f.text();
+}
+async function add(list){
+  for(const f of list){
+    try{const text=await readFile(f);if(text.trim().length<20)throw new Error("no text found (scanned PDF?)");files.push({name:f.name,text})}
+    catch(e){alert(f.name+": "+e.message)}
+  }
+  draw();
+}
+function draw(){
+  $("files").innerHTML="";
+  files.forEach((f,i)=>{const d=document.createElement("div");d.className="file";
+    d.innerHTML="<label style='margin:0;display:flex;gap:6px;color:inherit'><input type='checkbox' style='width:auto' aria-label='Include in study'><span></span></label><button aria-label='Remove'>×</button>";
+    d.querySelector("span").textContent=f.name+" ("+Math.round(f.text.length/1000)+"k chars)";
+    const c=d.querySelector("input");c.checked=f.on!==false;c.onchange=()=>{f.on=c.checked;draw()};
+    d.lastChild.onclick=()=>{files.splice(i,1);draw()};$("files").append(d)});
+  const on=files.filter(f=>f.on!==false).length;
+  $("status").textContent=files.length?on+" of "+files.length+" file(s) in use":"No files yet";
+  try{localStorage.setItem("sdf",JSON.stringify(files))}catch(e){$("status").textContent+=" (too large to remember)"}
+}
+$("drop").onclick=()=>$("pick").click();
+$("drop").onkeydown=e=>{if(e.key==="Enter")$("pick").click()};
+$("pick").onchange=e=>add(e.target.files);
+$("drop").ondragover=e=>{e.preventDefault();$("drop").classList.add("over")};
+$("drop").ondragleave=()=>$("drop").classList.remove("over");
+$("drop").ondrop=e=>{e.preventDefault();$("drop").classList.remove("over");add(e.dataTransfer.files)};
+
+function notes(q){
+  const all=files.filter(f=>f.on!==false).map(f=>"### "+f.name+"\n"+f.text).join("\n\n");
+  const max=$("prov").value==="gemini"?400000:$("prov").value==="claude"?300000:$("prov").value==="groq"?20000:24000;
+  if(all.length<=max)return all;
+  const ch=all.match(/[\s\S]{1,1500}(\s|$)/g)||[],n=Math.max(1,Math.floor(max/1500));
+  const w=(q||"").toLowerCase().match(/[a-z0-9]{4,}/g)||[];
+  let pick;
+  if(w.length){pick=ch.map((c,i)=>{const l=c.toLowerCase();return{i,s:w.reduce((a,x)=>a+l.split(x).length-1,0)}}).sort((a,b)=>b.s-a.s||a.i-b.i).slice(0,n).map(x=>x.i)}
+  else{pick=Array.from({length:n},(_,k)=>Math.floor(k*ch.length/n))}
+  pick=[...new Set(pick)].sort((a,b)=>a-b);
+  return pick.map(i=>ch[i]).join("\n...\n")+"\n[Notes were long, so only the "+(q?"most relevant":"sampled")+" parts are shown]";
+}
+async function ai(messages,json,focus,onTok){
+  if(!files.length)throw new Error("Add at least one study file first.");
+  const id=$("prov").value,p=PRE[id],h={"Content-Type":"application/json"};
+  if(p.key){if(!$("key").value)throw new Error("Paste your free API key first.");h.Authorization="Bearer "+$("key").value.trim()}
+  if(id==="claude"){delete h.Authorization;h["x-api-key"]=$("key").value.trim();h["anthropic-version"]="2023-06-01";h["anthropic-dangerous-direct-browser-access"]="true"}
+  let f=focus;
+  if(f===undefined){f=$("focus").value.trim();if(f){const l=messages[messages.length-1];messages=[...messages.slice(0,-1),{role:"user",content:l.content+" Focus on this topic: "+f}]}}
+  const sys="You are an exam-prep tutor. Use ONLY the student's notes below. If the notes don't cover something, say so.\n\nNOTES:\n"+notes(f);
+  const r=await fetch(p.url,{method:"POST",headers:h,body:JSON.stringify(id==="claude"?{model:$("model").value,max_tokens:4096,system:sys,messages,temperature:json?.3:.5,stream:!!onTok}:{model:$("model").value,messages:[{role:"system",content:sys},...messages],temperature:json?.3:.5,stream:!!onTok})});
+  if(!r.ok)throw new Error("AI error "+r.status+": "+(await r.text()).slice(0,200));
+  if(!onTok){const j=await r.json();return id==="claude"?j.content[0].text:j.choices[0].message.content}
+  const rd=r.body.getReader(),dec=new TextDecoder();let buf="",full="";
+  for(;;){const{done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});const ls=buf.split("\n");buf=ls.pop();
+    for(const l of ls){if(!l.startsWith("data:")||l.includes("[DONE]"))continue;try{const j=JSON.parse(l.slice(5));full+=(id==="claude"?(j.delta&&j.delta.text):j.choices[0].delta.content)||"";onTok(full)}catch(e){}}}
+  return full;
+}
+const parse=t=>JSON.parse(t.replace(/```json|```/g,"").trim().match(/[\[{][\s\S]*[\]}]/)[0]);
+function busy(b,on,txt){b.disabled=on;if(txt)b.textContent=txt}
+
+let hist=[];
+async function send(){
+  const q=$("ask").value.trim();if(!q)return;$("ask").value="";
+  const m=(c,t)=>{const d=document.createElement("div");d.className="msg "+c;d.textContent=t;$("log").append(d);return d};
+  m("me",q);hist.push({role:"user",content:q});const w=m("ai","Thinking…");
+  try{const a=await ai(hist.slice(-8),false,q,t=>{w.textContent=t;w.scrollIntoView({block:"nearest"})});w.textContent=a;hist.push({role:"assistant",content:a});gain(1)}catch(e){w.textContent=e.message}
+}
+$("send").onclick=send;$("ask").onkeydown=e=>{if(e.key==="Enter")send()};
+
+$("mkSum").onclick=async()=>{
+  busy($("mkSum"),true);$("out").textContent="Writing summary…";
+  try{$("out").textContent=await ai([{role:"user",content:"Write a concise exam revision summary: key concepts, definitions, formulas, and likely exam points, grouped by topic."}])}catch(e){$("out").textContent=e.message}
+  busy($("mkSum"),false);
+};
+
+let quizKey=null,cardKey=null;
+function runQuiz(qs){
+  let i=0,score=0,streak=0;const missed=[],box=$("quiz");
+  const show=()=>{
+    box.innerHTML="";quizKey=null;
+    if(i>=qs.length){const p=document.createElement("p");p.className="ui";p.textContent="Finished: "+score+" / "+qs.length+(score===qs.length?". Perfect score!":".");box.append(p);gain(score*5);
+      if(missed.length){const r=document.createElement("button");r.className="primary";r.textContent="Retry the "+missed.length+" you missed";r.onclick=()=>runQuiz(missed.slice());box.append(r)}return}
+    const q=qs[i],bar=document.createElement("div");bar.className="bar";bar.innerHTML="<i></i>";bar.firstChild.style.width=(i/qs.length*100)+"%";
+    const info=document.createElement("p");info.className="note ui";info.textContent="Question "+(i+1)+" of "+qs.length+", streak "+streak+". Press 1-4 to answer.";
+    const t=document.createElement("strong");t.textContent=q.q;
+    const why=document.createElement("div");why.className="why hide";why.textContent=q.why;
+    const nx=document.createElement("button");nx.className="primary hide";nx.textContent=i+1<qs.length?"Next question":"See results";nx.onclick=()=>{i++;show()};
+    let done=false;
+    const pick=j=>{if(done)return;done=true;
+      box.querySelectorAll(".opt").forEach((x,k)=>{if(k===q.answer)x.classList.add("right");else if(k===j)x.classList.add("wrong");x.disabled=true});
+      if(j===q.answer){score++;streak++;gain(1)}else{streak=0;missed.push(q)}
+      why.classList.remove("hide");nx.classList.remove("hide");nx.focus()};
+    box.append(bar,info,t);
+    q.options.forEach((o,j)=>{const b=document.createElement("button");b.className="opt";b.textContent=(j+1)+". "+o;b.onclick=()=>pick(j);box.append(b)});
+    box.append(why,nx);
+    quizKey=e=>{if(e.key>="1"&&e.key<="4")pick(+e.key-1)};
+  };show();
+}
+$("mkQuiz").onclick=async()=>{
+  busy($("mkQuiz"),true);$("quiz").textContent="Building quiz…";
+  try{runQuiz(parse(await ai([{role:"user",content:`Write ${$("qn").value} multiple-choice exam questions that test understanding, not just recall. Return ONLY a JSON array of {"q":string,"options":[4 strings],"answer":index 0-3,"why":string}.`}],true)))}catch(e){$("quiz").textContent=e.message}
+  busy($("mkQuiz"),false);
+};
+function runCards(cs){
+  cs=[...cs].sort(()=>Math.random()-.5);
+  let i=0;const miss=[],box=$("cardbox");
+  const show=()=>{
+    box.innerHTML="";cardKey=null;
+    if(i>=cs.length){const p=document.createElement("p");p.className="ui";p.textContent="Round finished. You missed "+miss.length+" of "+cs.length+".";box.append(p);
+      if(miss.length){const b=document.createElement("button");b.className="primary";b.textContent="Review the missed cards";b.onclick=()=>runCards(miss.slice());box.append(b)}return}
+    const bar=document.createElement("div");bar.className="bar";bar.innerHTML="<i></i>";bar.firstChild.style.width=(i/cs.length*100)+"%";
+    const w=document.createElement("div");w.className="flip";w.innerHTML="<div class='in' tabindex='0'><div class='face'></div><div class='face back'></div></div>";
+    const inn=w.firstChild,[f,b]=inn.children;f.textContent=cs[i].front;b.textContent=cs[i].back;
+    const flip=()=>w.classList.toggle("on"),no=()=>{miss.push(cs[i]);i++;show()},yes=()=>{gain(1);i++;show()};
+    inn.onclick=flip;
+    const nav=document.createElement("div");nav.className="row ui";
+    const mk=(txt,cls,fn)=>{const x=document.createElement("button");x.textContent=txt;if(cls)x.className=cls;x.onclick=fn;nav.append(x)};
+    mk("Missed it","",no);mk("Got it","primary",yes);
+    const n=document.createElement("span");n.className="note";n.textContent=(i+1)+" of "+cs.length+". Space flips, left arrow = missed, right arrow = got it.";
+    nav.append(n);box.append(bar,w,nav);
+    cardKey=e=>{if(e.key===" "&&e.target.tagName!=="BUTTON"){e.preventDefault();flip()}else if(e.key==="ArrowLeft")no();else if(e.key==="ArrowRight")yes()};
+  };show();
+}
+$("mkCards").onclick=async()=>{
+  busy($("mkCards"),true);$("cardbox").textContent="Building cards…";
+  try{runCards(parse(await ai([{role:"user",content:`Make ${$("cn").value} flashcards of the most testable facts. Return ONLY a JSON array of {"front":string,"back":string}.`}],true)))}catch(e){$("cardbox").textContent=e.message}
+  busy($("mkCards"),false);
+};
+draw();
+function gain(n){S.xp=(S.xp||0)+n;save();$("xp").textContent="XP "+S.xp}
+document.addEventListener("keydown",e=>{
+  if(["INPUT","SELECT"].includes(e.target.tagName))return;
+  if(!$("t-quiz").classList.contains("hide")&&quizKey)quizKey(e);
+  if(!$("t-cards").classList.contains("hide")&&cardKey)cardKey(e);
+});
+["Explain the basics simply","Test me with one question","Give a real-world example","What is likely on the exam?"].forEach(t=>{const b=document.createElement("button");b.textContent=t;b.onclick=()=>{$("ask").value=t;send()};$("chips").append(b)});
+let pt=null,left=1500,brk=false;
+const fmt=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+function pshow(){$("pm").textContent=(brk?"Break ":"Focus ")+fmt(left)+(pt?" (pause)":" (start)")}
+$("pm").onclick=()=>{if(pt){clearInterval(pt);pt=null}else pt=setInterval(()=>{if(--left<=0){if(!brk)gain(25);brk=!brk;left=brk?300:1500;clearInterval(pt);pt=null;try{navigator.vibrate&&navigator.vibrate(200)}catch(e){}}pshow()},1000);pshow()};
+pshow();gain(0);
+let dp=null;
+addEventListener("beforeinstallprompt",e=>{e.preventDefault();dp=e;$("inst").classList.remove("hide")});
+$("inst").onclick=async()=>{if(dp){dp.prompt();await dp.userChoice;dp=null;$("inst").classList.add("hide")}};
+addEventListener("appinstalled",()=>$("inst").classList.add("hide"));
+if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
